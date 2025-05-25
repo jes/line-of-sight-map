@@ -39,10 +39,15 @@ const styles = {
 };
 
 // Configuration constants
-const DEGREE_STEP = 1;
-const SAMPLE_POINTS = 200; // Number of points to sample along each ray
+const DEGREE_STEP = 0.5;
+const SAMPLE_POINTS = 800; // Number of points to sample along each ray
 const OBSERVER_HEIGHT = 2; // Height of the observer in meters
 const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
+const PROGRESSIVE_RENDERING = {
+    anglesPerIteration: 45, // Process 45 angles per iteration
+    totalAngles: 3000,     // Target total number of angles (increased from 1000 to 10000)
+    delayBetweenIterations: 10 // 10ms delay between iterations
+};
 
 // Helper functions for map setup
 function setupTerrainSource(map) {
@@ -277,7 +282,7 @@ async function castRay(startPoint, angle, maxDistance) {
 }
 
 // Function to generate the line of sight GeoJSON
-async function generateLineOfSightGeoJSON() {
+async function generateLineOfSightGeoJSON(degreeStep = DEGREE_STEP) {
     if (!vantageMarker) return null;
 
     const vantagePoint = vantageMarker.getLngLat();
@@ -285,7 +290,7 @@ async function generateLineOfSightGeoJSON() {
     const features = [];
     
     // Create radial lines at specified degree intervals
-    for (let angle = 0; angle < 360; angle += DEGREE_STEP) {
+    for (let angle = 0; angle < 360; angle += degreeStep) {
         const rayResult = await castRay(vantagePoint, angle, viewportDistance);
         
         // Add a feature for each blocked segment
@@ -311,47 +316,133 @@ async function generateLineOfSightGeoJSON() {
     };
 }
 
-// Function to update the line of sight layer
-async function updateLineOfSight() {
-    if (!isTerrainLoaded) {
+// Progressive rendering state
+let progressiveRenderTimer = null;
+let isProgressiveRendering = false;
+let currentFeatures = []; // Store all features generated so far
+let processedAngles = new Set(); // Track which angles have been processed
+
+// Function to start progressive rendering
+function startProgressiveRendering() {
+    // Clear any existing progressive rendering
+    if (progressiveRenderTimer) {
+        clearTimeout(progressiveRenderTimer);
+    }
+    
+    // Reset state
+    currentFeatures = [];
+    processedAngles = new Set();
+    
+    // Set up progressive rendering
+    isProgressiveRendering = true;
+    
+    // Start the first iteration
+    processNextBatchOfAngles();
+}
+
+// Function to process the next batch of angles
+async function processNextBatchOfAngles() {
+    if (!isProgressiveRendering || !isTerrainLoaded || !vantageMarker) {
         return;
     }
-
+    
     try {
-        // Remove existing layer and source if they exist
-        if (map.getLayer(LINE_OF_SIGHT_LAYER)) {
-            map.removeLayer(LINE_OF_SIGHT_LAYER);
-        }
-        if (map.getSource(LINE_OF_SIGHT_SOURCE)) {
-            map.removeSource(LINE_OF_SIGHT_SOURCE);
-        }
-
-        // Only add new layer if we have a vantage point
-        if (vantageMarker) {
-            const geojson = await generateLineOfSightGeoJSON();
+        const vantagePoint = vantageMarker.getLngLat();
+        const viewportDistance = calculateViewportDistance(vantagePoint);
+        
+        // Generate new features for the current batch
+        const newFeatures = [];
+        let anglesProcessed = 0;
+        
+        // Process angles until we've done our batch or reached the total
+        while (anglesProcessed < PROGRESSIVE_RENDERING.anglesPerIteration && 
+               processedAngles.size < PROGRESSIVE_RENDERING.totalAngles) {
             
-            if (!geojson || !geojson.features || geojson.features.length === 0) {
-                return;
+            // Generate a random angle between 0 and 360
+            const angle = Math.random() * 360;
+            
+            // Skip if we've already processed this angle (with a small tolerance)
+            const roundedAngle = Math.round(angle * 10) / 10; // Round to 1 decimal place
+            if (processedAngles.has(roundedAngle)) {
+                continue;
             }
-
-            map.addSource(LINE_OF_SIGHT_SOURCE, {
-                type: 'geojson',
-                data: geojson
-            });
-
-            map.addLayer({
-                id: LINE_OF_SIGHT_LAYER,
-                type: 'line',
-                source: LINE_OF_SIGHT_SOURCE,
-                paint: {
-                    'line-color': '#000000',
-                    'line-opacity': 0.5,
-                    'line-width': 2
+            
+            // Mark this angle as processed
+            processedAngles.add(roundedAngle);
+            anglesProcessed++;
+            
+            // Cast the ray and process the result
+            const rayResult = await castRay(vantagePoint, angle, viewportDistance);
+            
+            // Add a feature for each blocked segment
+            for (const segment of rayResult.segments) {
+                if (segment.isBlocked) {
+                    newFeatures.push({
+                        type: 'Feature',
+                        properties: { angle: angle },
+                        geometry: {
+                            type: 'LineString',
+                            coordinates: [
+                                [segment.start.lng, segment.start.lat],
+                                [segment.end.lng, segment.end.lat]
+                            ]
+                        }
+                    });
                 }
-            });
+            }
+        }
+        
+        // Add new features to our collection
+        if (newFeatures.length > 0) {
+            currentFeatures = [...currentFeatures, ...newFeatures];
+            
+            // Update the source data
+            if (map.getSource(LINE_OF_SIGHT_SOURCE)) {
+                map.getSource(LINE_OF_SIGHT_SOURCE).setData({
+                    type: 'FeatureCollection',
+                    features: currentFeatures
+                });
+            } else {
+                // Create the source and layer if they don't exist
+                map.addSource(LINE_OF_SIGHT_SOURCE, {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: currentFeatures
+                    }
+                });
+                
+                map.addLayer({
+                    id: LINE_OF_SIGHT_LAYER,
+                    type: 'line',
+                    source: LINE_OF_SIGHT_SOURCE,
+                    paint: {
+                        'line-color': '#000000',
+                        'line-opacity': 0.5,
+                        'line-width': 3
+                    }
+                });
+            }
+        }
+        
+        // Schedule the next batch if we haven't reached the total
+        if (processedAngles.size < PROGRESSIVE_RENDERING.totalAngles) {
+            progressiveRenderTimer = setTimeout(processNextBatchOfAngles, PROGRESSIVE_RENDERING.delayBetweenIterations);
+        } else {
+            isProgressiveRendering = false;
         }
     } catch (error) {
-        console.error('Error updating line of sight:', error);
+        console.error('Error processing batch of angles:', error);
+        isProgressiveRendering = false;
+    }
+}
+
+// Function to stop progressive rendering
+function stopProgressiveRendering() {
+    isProgressiveRendering = false;
+    if (progressiveRenderTimer) {
+        clearTimeout(progressiveRenderTimer);
+        progressiveRenderTimer = null;
     }
 }
 
@@ -360,11 +451,24 @@ function debouncedUpdate() {
     if (updateTimer) {
         clearTimeout(updateTimer);
     }
+    
+    // Stop any ongoing progressive rendering
+    stopProgressiveRendering();
+    
+    // Clear existing layer and source
+    if (map.getLayer(LINE_OF_SIGHT_LAYER)) {
+        map.removeLayer(LINE_OF_SIGHT_LAYER);
+    }
+    if (map.getSource(LINE_OF_SIGHT_SOURCE)) {
+        map.removeSource(LINE_OF_SIGHT_SOURCE);
+    }
+    
     updateTimer = setTimeout(async () => {
         if (isTerrainLoaded) {
-            await updateLineOfSight();
+            // Start progressive rendering instead of immediate full update
+            startProgressiveRendering();
         }
-    }, 500);
+    }, 100);
 }
 
 // Handle map clicks to set vantage point
@@ -422,7 +526,7 @@ document.getElementById('style-switch').addEventListener('change', (event) => {
             // Wait a bit for terrain to be ready before updating
             setTimeout(() => {
                 updateLineOfSight();
-            }, 1000);
+            }, 100);
         }
     });
 }); 
