@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MapLibre GL JS Map</title>
+    <title>Line of Sight Map</title>
     <script src='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js'></script>
     <link href='https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css' rel='stylesheet' />
     <style>
@@ -50,11 +50,11 @@
     <div id="map"></div>
     <div class="map-overlay">
         <select id="style-switch">
-            <option value="map">Map View</option>
-            <option value="satellite">Satellite View</option>
+            <option value="map">Map view</option>
+            <option value="satellite">Satellite view</option>
         </select>
-        <button id="delete-vantage" class="toolbar-button delete">Delete Vantage Point</button>
-        <div id="instructions">Click to set your vantage point</div>
+        <button id="delete-vantage" class="toolbar-button delete">Delete vantage point</button>
+        <div id="instructions">Click on the map to set your vantage point</div>
     </div>
     <script src="map.js"></script>
 </body>
