@@ -418,8 +418,8 @@ async function processNextBatchOfAngles() {
                     source: LINE_OF_SIGHT_SOURCE,
                     paint: {
                         'line-color': '#000000',
-                        'line-opacity': 0.5,
-                        'line-width': 3
+                        'line-opacity': 0.2,
+                        'line-width': 2
                     }
                 });
             }
