@@ -49,10 +49,39 @@ const map = new maplibregl.Map({
 // Add navigation controls
 map.addControl(new maplibregl.NavigationControl());
 
+// Variable to store the vantage point marker
+let vantageMarker = null;
+
+// Handle map clicks to set vantage point
+map.on('click', (e) => {
+    const coordinates = e.lngLat;
+    
+    // If marker already exists, move it
+    if (vantageMarker) {
+        vantageMarker.setLngLat(coordinates);
+    } else {
+        // Create new marker
+        vantageMarker = new maplibregl.Marker({
+            color: '#FF0000',
+            draggable: true
+        })
+        .setLngLat(coordinates)
+        .addTo(map);
+    }
+});
+
 // Handle style switching
 document.getElementById('style-switch').addEventListener('change', (event) => {
     const selectedStyle = event.target.value;
     map.setStyle(styles[selectedStyle]);
+    
+    // Re-add marker after style change (since style changes clear all layers)
+    if (vantageMarker) {
+        const coordinates = vantageMarker.getLngLat();
+        map.once('style.load', () => {
+            vantageMarker.addTo(map);
+        });
+    }
 });
 
 // This will be useful for adding custom layers later
