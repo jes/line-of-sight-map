@@ -202,6 +202,24 @@ function calculateDestinationPoint(startLngLat, bearing, distance) {
     );
 }
 
+// Function to calculate maximum distance to viewport edges
+function calculateViewportDistance(vantagePoint) {
+    const bounds = map.getBounds();
+    const ne = bounds.getNorthEast();
+    const nw = bounds.getNorthWest();
+    const se = bounds.getSouthEast();
+    const sw = bounds.getSouthWest();
+
+    // Calculate distances to all corners
+    const distances = [ne, nw, se, sw].map(corner => {
+        const cornerLngLat = new maplibregl.LngLat(corner.lng, corner.lat);
+        return vantagePoint.distanceTo(cornerLngLat);
+    });
+
+    // Return the maximum distance
+    return Math.max(...distances);
+}
+
 // Function to cast a ray and find terrain intersections
 async function castRay(startPoint, angle, maxDistance) {
     if (!isTerrainLoaded) {
@@ -274,11 +292,12 @@ async function generateLineOfSightGeoJSON() {
 
     console.log('Generating line of sight GeoJSON');
     const vantagePoint = vantageMarker.getLngLat();
+    const viewportDistance = calculateViewportDistance(vantagePoint);
     const features = [];
     
     // Create radial lines at 1-degree intervals
     for (let angle = 0; angle < 360; angle += DEGREE_STEP) {
-        const rayResult = await castRay(vantagePoint, angle, LINE_LENGTH_METERS);
+        const rayResult = await castRay(vantagePoint, angle, viewportDistance);
         
         // Add a feature for each blocked segment
         for (const segment of rayResult.segments) {
