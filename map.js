@@ -39,7 +39,7 @@ const styles = {
 };
 
 // Configuration constants
-const DEGREE_STEP = 2;
+const DEGREE_STEP = 1;
 const SAMPLE_POINTS = 200; // Number of points to sample along each ray
 const OBSERVER_HEIGHT = 2; // Height of the observer in meters
 const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
@@ -102,8 +102,8 @@ function setupTerrainAndHillshading(map) {
 const map = new maplibregl.Map({
     container: 'map',
     style: styles.map,
-    center: [-106.8677, 39.1911],  // Aspen, Colorado
-    zoom: 12
+    center: [0, 0],  // Default world view (center of the map)
+    zoom: 2  // Zoom level that shows most of the world
 });
 
 // Add navigation controls
