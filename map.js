@@ -471,6 +471,37 @@ function debouncedUpdate() {
     }, 100);
 }
 
+// Function to update delete button visibility
+function updateDeleteButtonVisibility() {
+    const deleteButton = document.getElementById('delete-vantage');
+    if (deleteButton) {
+        deleteButton.style.display = vantageMarker ? 'block' : 'none';
+    }
+}
+
+// Function to delete vantage point
+function deleteVantagePoint() {
+    if (vantageMarker) {
+        vantageMarker.remove();
+        vantageMarker = null;
+        
+        // Clear any existing line of sight visualization
+        if (map.getLayer(LINE_OF_SIGHT_LAYER)) {
+            map.removeLayer(LINE_OF_SIGHT_LAYER);
+        }
+        if (map.getSource(LINE_OF_SIGHT_SOURCE)) {
+            map.removeSource(LINE_OF_SIGHT_SOURCE);
+        }
+        
+        // Show instructions again and hide delete button
+        const instructions = document.getElementById('instructions');
+        if (instructions) {
+            instructions.style.display = 'block';
+        }
+        updateDeleteButtonVisibility();
+    }
+}
+
 // Handle map clicks to set vantage point
 map.on('click', (e) => {
     const coordinates = e.lngLat;
@@ -487,14 +518,12 @@ map.on('click', (e) => {
         .setLngLat(coordinates)
         .addTo(map);
 
-        // Hide the message overlay after first click
-        const messageOverlay = document.getElementById('message-overlay');
-        if (messageOverlay) {
-            messageOverlay.style.opacity = '0';
-            setTimeout(() => {
-                messageOverlay.style.display = 'none';
-            }, 300);
+        // Hide the instructions after first click and show delete button
+        const instructions = document.getElementById('instructions');
+        if (instructions) {
+            instructions.style.display = 'none';
         }
+        updateDeleteButtonVisibility();
 
         // Add drag end handler
         vantageMarker.on('dragend', () => {
@@ -505,6 +534,12 @@ map.on('click', (e) => {
     // Update lines after vantage point changes
     debouncedUpdate();
 });
+
+// Initialize delete button visibility
+updateDeleteButtonVisibility();
+
+// Add delete button handler
+document.getElementById('delete-vantage').addEventListener('click', deleteVantagePoint);
 
 // Update lines when the view changes
 map.on('moveend', debouncedUpdate);

@@ -17,19 +17,32 @@
             padding: 10px;
             border-radius: 4px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        #message-overlay {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 20px;
-            font-size: 18px;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
+        .toolbar-button {
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .toolbar-button:hover {
+            background: #f0f0f0;
+        }
+        .toolbar-button.delete {
+            color: #ff0000;
+            border-color: #ff0000;
+        }
+        .toolbar-button.delete:hover {
+            background: #ffebeb;
+        }
+        #instructions {
+            margin-left: 10px;
+            color: #666;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -40,8 +53,9 @@
             <option value="map">Map View</option>
             <option value="satellite">Satellite View</option>
         </select>
+        <button id="delete-vantage" class="toolbar-button delete">Delete Vantage Point</button>
+        <div id="instructions">Click to set your vantage point</div>
     </div>
-    <div id="message-overlay">Click to set your vantage point</div>
     <script src="map.js"></script>
 </body>
 </html> 
