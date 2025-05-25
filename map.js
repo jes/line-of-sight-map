@@ -175,6 +175,30 @@ function calculateAngle(start, end, startElevation, endElevation) {
     return Math.atan2(heightDiff, distance);
 }
 
+// Function to calculate destination point given start, bearing and distance
+function calculateDestinationPoint(startLngLat, bearing, distance) {
+    const R = 6371000; // Earth's radius in meters
+    const d = distance / R;  // Angular distance
+    const lat1 = startLngLat.lat * Math.PI / 180;
+    const lon1 = startLngLat.lng * Math.PI / 180;
+    const brng = bearing * Math.PI / 180;
+
+    const lat2 = Math.asin(
+        Math.sin(lat1) * Math.cos(d) +
+        Math.cos(lat1) * Math.sin(d) * Math.cos(brng)
+    );
+
+    const lon2 = lon1 + Math.atan2(
+        Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
+        Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
+    );
+
+    return new maplibregl.LngLat(
+        (lon2 * 180 / Math.PI + 540) % 360 - 180, // Normalize longitude
+        lat2 * 180 / Math.PI
+    );
+}
+
 // Function to cast a ray and find terrain intersections
 async function castRay(startPoint, angle, maxDistance) {
     if (!isTerrainLoaded) {
@@ -188,9 +212,6 @@ async function castRay(startPoint, angle, maxDistance) {
     const OBSERVER_HEIGHT = 2; // 2 meters above ground
     const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
 
-    // Convert angle to radians for calculation
-    const angleRad = (angle * Math.PI) / 180;
-    
     const points = [];
     const segments = [];
     let currentSegment = null;
@@ -201,9 +222,8 @@ async function castRay(startPoint, angle, maxDistance) {
         const fraction = i / SAMPLE_POINTS;
         const distance = maxDistance * fraction;
         
-        // Calculate the point coordinates
-        const bearing = angle;
-        const point = new maplibregl.LngLat(startPoint.lng, startPoint.lat).toBearing(bearing, distance);
+        // Calculate the point coordinates using the new helper function
+        const point = calculateDestinationPoint(startPoint, angle, distance);
         const elevation = await getElevation(point);
 
         // Calculate the angle to this point
