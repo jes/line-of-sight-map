@@ -103,6 +103,87 @@ function setupTerrainAndHillshading(map) {
     setupHillshading(map);
 }
 
+// URL Fragment State Management
+function updateUrlFragment() {
+    const center = map.getCenter();
+    const zoom = map.getZoom();
+    const fragment = {
+        lat: center.lat.toFixed(6),
+        lng: center.lng.toFixed(6),
+        zoom: zoom.toFixed(2)
+    };
+    
+    if (vantageMarker) {
+        const vantagePoint = vantageMarker.getLngLat();
+        fragment.vantageLat = vantagePoint.lat.toFixed(6);
+        fragment.vantageLng = vantagePoint.lng.toFixed(6);
+    }
+    
+    const fragmentString = Object.entries(fragment)
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&');
+    
+    window.location.hash = fragmentString;
+}
+
+function parseUrlFragment() {
+    const fragment = window.location.hash.substring(1);
+    if (!fragment) return null;
+    
+    const params = {};
+    fragment.split('&').forEach(param => {
+        const [key, value] = param.split('=');
+        params[key] = parseFloat(value);
+    });
+    
+    return params;
+}
+
+function restoreStateFromUrl() {
+    const params = parseUrlFragment();
+    if (!params) return;
+    
+    // Restore viewport
+    if (params.lat && params.lng && params.zoom) {
+        map.setCenter([params.lng, params.lat]);
+        map.setZoom(params.zoom);
+    }
+    
+    // Restore vantage point
+    if (params.vantageLat && params.vantageLng) {
+        const coordinates = new maplibregl.LngLat(params.vantageLng, params.vantageLat);
+        
+        // Remove existing marker if any
+        if (vantageMarker) {
+            vantageMarker.remove();
+        }
+        
+        // Create new marker
+        vantageMarker = new maplibregl.Marker({
+            color: '#FF0000',
+            draggable: true
+        })
+        .setLngLat(coordinates)
+        .addTo(map);
+        
+        // Hide instructions and show delete button
+        const instructions = document.getElementById('instructions');
+        if (instructions) {
+            instructions.style.display = 'none';
+        }
+        updateDeleteButtonVisibility();
+        
+        // Add drag end handler
+        vantageMarker.on('dragend', () => {
+            debouncedUpdate();
+            updateUrlFragment();
+        });
+        
+        // Update line of sight
+        debouncedUpdate();
+    }
+}
+
 // Initialize the map
 const map = new maplibregl.Map({
     container: 'map',
@@ -117,7 +198,7 @@ map.addControl(new maplibregl.NavigationControl());
 // Track if terrain is ready
 let isTerrainLoaded = false;
 
-// Add terrain source
+// Add terrain source and restore state
 map.on('load', () => {
     setupTerrainAndHillshading(map);
 
@@ -125,6 +206,8 @@ map.on('load', () => {
     map.on('sourcedata', (e) => {
         if (e.sourceId === 'terrain' && e.isSourceLoaded && !isTerrainLoaded) {
             isTerrainLoaded = true;
+            // Restore state after terrain is loaded
+            restoreStateFromUrl();
         }
     });
 });
@@ -499,6 +582,9 @@ function deleteVantagePoint() {
             instructions.style.display = 'block';
         }
         updateDeleteButtonVisibility();
+        
+        // Update URL fragment
+        updateUrlFragment();
     }
 }
 
@@ -528,11 +614,13 @@ map.on('click', (e) => {
         // Add drag end handler
         vantageMarker.on('dragend', () => {
             debouncedUpdate();
+            updateUrlFragment();
         });
     }
     
     // Update lines after vantage point changes
     debouncedUpdate();
+    updateUrlFragment();
 });
 
 // Initialize delete button visibility
@@ -542,9 +630,18 @@ updateDeleteButtonVisibility();
 document.getElementById('delete-vantage').addEventListener('click', deleteVantagePoint);
 
 // Update lines when the view changes
-map.on('moveend', debouncedUpdate);
-map.on('zoomend', debouncedUpdate);
-map.on('rotateend', debouncedUpdate);
+map.on('moveend', () => {
+    debouncedUpdate();
+    updateUrlFragment();
+});
+map.on('zoomend', () => {
+    debouncedUpdate();
+    updateUrlFragment();
+});
+map.on('rotateend', () => {
+    debouncedUpdate();
+    updateUrlFragment();
+});
 
 // Handle style switching
 document.getElementById('style-switch').addEventListener('change', (event) => {
