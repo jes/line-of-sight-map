@@ -219,6 +219,15 @@ map.on('load', () => {
             isTerrainLoaded = true;
             // Restore state after terrain is loaded
             restoreStateFromUrl();
+            
+            // Force a viewport update to trigger marker position recalculation
+            if (vantageMarker) {
+                const center = map.getCenter();
+                map.setCenter([center.lng + 0.000001, center.lat]);
+                setTimeout(() => {
+                    map.setCenter([center.lng, center.lat]);
+                }, 50);
+            }
         }
     });
 });
