@@ -40,9 +40,10 @@ const styles = {
 
 // Configuration constants
 const LINE_LENGTH_METERS = 1000; // 1km sight distance
-const DEGREE_STEP = 1;
-const SAMPLE_POINTS = 50; // Number of points to sample along each ray
+const DEGREE_STEP = 2;
+const SAMPLE_POINTS = 200; // Number of points to sample along each ray
 const OBSERVER_HEIGHT = 2; // Height of the observer in meters
+const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
 
 // Helper functions for map setup
 function setupTerrainSource(map) {
@@ -142,11 +143,6 @@ let updateTimer = null;
 const LINE_OF_SIGHT_LAYER = 'line-of-sight';
 const LINE_OF_SIGHT_SOURCE = 'line-of-sight-source';
 
-// Function to decode elevation from terrarium encoding
-function getElevationFromTerrainRGB(r, g, b) {
-    return (r * 256 + g + b / 256) - 32768;
-}
-
 // Function to get elevation at a point
 async function getElevation(lngLat) {
     if (!isTerrainLoaded) {
@@ -216,8 +212,8 @@ function calculateViewportDistance(vantagePoint) {
         return vantagePoint.distanceTo(cornerLngLat);
     });
 
-    // Return the maximum distance
-    return Math.max(...distances);
+    // Return the maximum distance, capped at MAX_LINE_LENGTH_METERS
+    return Math.min(Math.max(...distances), MAX_LINE_LENGTH_METERS);
 }
 
 // Function to cast a ray and find terrain intersections
@@ -249,11 +245,11 @@ async function castRay(startPoint, angle, maxDistance) {
         // Calculate the angle to this point
         const pointAngle = calculateAngle(startPoint, point, adjustedStartElevation, elevation);
         
-        // Determine visibility
-        const isBlocked = pointAngle > maxAngleSeen;
+        // Determine visibility - a point is blocked if its angle is less than the maximum angle seen
+        const isBlocked = pointAngle < maxAngleSeen;
         
         if (isBlocked) {
-            // Point is blocked - start or continue a blocked segment
+            // Point is blocked by terrain - start or continue a blocked segment
             if (!currentSegment) {
                 currentSegment = {
                     start: i > 0 ? points[i-1] : startPoint,
@@ -263,13 +259,14 @@ async function castRay(startPoint, angle, maxDistance) {
             } else {
                 currentSegment.end = point;
             }
-            maxAngleSeen = Math.max(maxAngleSeen, pointAngle);
         } else {
             // Point is visible - end any current blocked segment
             if (currentSegment) {
                 segments.push(currentSegment);
                 currentSegment = null;
             }
+            // Update the maximum angle seen for future point comparisons
+            maxAngleSeen = Math.max(maxAngleSeen, pointAngle);
         }
 
         points.push(point);
