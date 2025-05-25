@@ -18,6 +18,19 @@
             border-radius: 4px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
+        #message-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 20px;
+            font-size: 18px;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -28,6 +41,7 @@
             <option value="satellite">Satellite View</option>
         </select>
     </div>
+    <div id="message-overlay">Click to set your vantage point</div>
     <script src="map.js"></script>
 </body>
 </html> 

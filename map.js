@@ -67,6 +67,13 @@ map.on('click', (e) => {
         })
         .setLngLat(coordinates)
         .addTo(map);
+
+        // Hide the message overlay after first click
+        const messageOverlay = document.getElementById('message-overlay');
+        messageOverlay.style.opacity = '0';
+        setTimeout(() => {
+            messageOverlay.style.display = 'none';
+        }, 300); // Wait for fade out animation to complete
     }
 });
 
