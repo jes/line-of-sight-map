@@ -39,7 +39,6 @@ const styles = {
 };
 
 // Configuration constants
-const LINE_LENGTH_METERS = 1000; // 1km sight distance
 const DEGREE_STEP = 2;
 const SAMPLE_POINTS = 200; // Number of points to sample along each ray
 const OBSERVER_HEIGHT = 2; // Height of the observer in meters
@@ -47,11 +46,8 @@ const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
 
 // Helper functions for map setup
 function setupTerrainSource(map) {
-    console.log('Adding terrain source...');
-    
     // Check if terrain source already exists
     if (map.getSource('terrain')) {
-        console.log('Terrain source already exists, removing...');
         map.removeSource('terrain');
     }
 
@@ -65,11 +61,8 @@ function setupTerrainSource(map) {
             'maxzoom': 15,
             'encoding': 'terrarium'
         });
-        console.log('Successfully added terrain source');
         
-        console.log('Setting up terrain exaggeration...');
         map.setTerrain({ 'source': 'terrain', 'exaggeration': 1.0 });
-        console.log('Terrain setup complete');
     } catch (error) {
         console.error('Error setting up terrain:', error);
     }
@@ -95,8 +88,6 @@ function setupHillshading(map) {
                 'hillshade-accent-color': 'rgba(0, 0, 0, 0.5)'
             }
         });
-        
-        console.log('Successfully added hillshade layer');
     } catch (error) {
         console.error('Error adding hillshade layer:', error);
     }
@@ -106,8 +97,6 @@ function setupTerrainAndHillshading(map) {
     setupTerrainSource(map);
     setupHillshading(map);
 }
-
-console.log('Initializing map...');
 
 // Initialize the map
 const map = new maplibregl.Map({
@@ -125,13 +114,11 @@ let isTerrainLoaded = false;
 
 // Add terrain source
 map.on('load', () => {
-    console.log('Map style loaded');
     setupTerrainAndHillshading(map);
 
     // Wait for terrain to be loaded
     map.on('sourcedata', (e) => {
         if (e.sourceId === 'terrain' && e.isSourceLoaded && !isTerrainLoaded) {
-            console.log('Terrain data loaded!');
             isTerrainLoaded = true;
         }
     });
@@ -146,13 +133,11 @@ const LINE_OF_SIGHT_SOURCE = 'line-of-sight-source';
 // Function to get elevation at a point
 async function getElevation(lngLat) {
     if (!isTerrainLoaded) {
-        console.warn('Terrain data not yet loaded');
         return 0;
     }
 
     try {
         const elevation = map.queryTerrainElevation(lngLat);
-        console.log(`Elevation at ${lngLat.lng.toFixed(4)}, ${lngLat.lat.toFixed(4)}: ${elevation}`);
         return elevation || 0;
     } catch (e) {
         console.error('Error getting elevation:', e);
@@ -225,81 +210,87 @@ async function castRay(startPoint, angle, maxDistance) {
         };
     }
 
-    const startElevation = await getElevation(startPoint);
-    const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
+    try {
+        const startElevation = await getElevation(startPoint);
+        const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
 
-    const points = [];
-    const segments = [];
-    let currentSegment = null;
-    let maxAngleSeen = -Infinity;
+        const points = [];
+        const segments = [];
+        let currentSegment = null;
+        let maxAngleSeen = -Infinity;
 
-    // Sample points along the ray
-    for (let i = 0; i <= SAMPLE_POINTS; i++) {
-        const fraction = i / SAMPLE_POINTS;
-        const distance = maxDistance * fraction;
-        
-        // Calculate the point coordinates using the new helper function
-        const point = calculateDestinationPoint(startPoint, angle, distance);
-        const elevation = await getElevation(point);
+        // Sample points along the ray
+        for (let i = 0; i <= SAMPLE_POINTS; i++) {
+            const fraction = i / SAMPLE_POINTS;
+            const distance = maxDistance * fraction;
+            
+            // Calculate the point coordinates using the new helper function
+            const point = calculateDestinationPoint(startPoint, angle, distance);
+            const elevation = await getElevation(point);
 
-        // Calculate the angle to this point
-        const pointAngle = calculateAngle(startPoint, point, adjustedStartElevation, elevation);
-        
-        // Determine visibility - a point is blocked if its angle is less than the maximum angle seen
-        const isBlocked = pointAngle < maxAngleSeen;
-        
-        if (isBlocked) {
-            // Point is blocked by terrain - start or continue a blocked segment
-            if (!currentSegment) {
-                currentSegment = {
-                    start: i > 0 ? points[i-1] : startPoint,
-                    end: point,
-                    isBlocked: true
-                };
+            // Calculate the angle to this point
+            const pointAngle = calculateAngle(startPoint, point, adjustedStartElevation, elevation);
+            
+            // Determine visibility - a point is blocked if its angle is less than the maximum angle seen
+            const isBlocked = pointAngle < maxAngleSeen;
+            
+            if (isBlocked) {
+                // Point is blocked by terrain - start or continue a blocked segment
+                if (!currentSegment) {
+                    currentSegment = {
+                        start: i > 0 ? points[i-1] : startPoint,
+                        end: point,
+                        isBlocked: true
+                    };
+                } else {
+                    currentSegment.end = point;
+                }
             } else {
-                currentSegment.end = point;
+                // Point is visible - end any current blocked segment
+                if (currentSegment) {
+                    segments.push(currentSegment);
+                    currentSegment = null;
+                }
+                // Update the maximum angle seen for future point comparisons
+                maxAngleSeen = Math.max(maxAngleSeen, pointAngle);
             }
-        } else {
-            // Point is visible - end any current blocked segment
-            if (currentSegment) {
-                segments.push(currentSegment);
-                currentSegment = null;
-            }
-            // Update the maximum angle seen for future point comparisons
-            maxAngleSeen = Math.max(maxAngleSeen, pointAngle);
+
+            points.push(point);
         }
 
-        points.push(point);
-    }
+        // Add final segment if we ended with a blocked segment
+        if (currentSegment) {
+            segments.push(currentSegment);
+        }
 
-    // Add final segment if we ended with a blocked segment
-    if (currentSegment) {
-        segments.push(currentSegment);
+        return {
+            start: startPoint,
+            segments: segments
+        };
+    } catch (error) {
+        console.error('Error in castRay:', error);
+        return {
+            start: startPoint,
+            segments: []
+        };
     }
-
-    return {
-        start: startPoint,
-        segments: segments
-    };
 }
 
 // Function to generate the line of sight GeoJSON
 async function generateLineOfSightGeoJSON() {
     if (!vantageMarker) return null;
 
-    console.log('Generating line of sight GeoJSON');
     const vantagePoint = vantageMarker.getLngLat();
     const viewportDistance = calculateViewportDistance(vantagePoint);
     const features = [];
     
-    // Create radial lines at 1-degree intervals
+    // Create radial lines at specified degree intervals
     for (let angle = 0; angle < 360; angle += DEGREE_STEP) {
         const rayResult = await castRay(vantagePoint, angle, viewportDistance);
         
         // Add a feature for each blocked segment
         for (const segment of rayResult.segments) {
             if (segment.isBlocked) {
-                console.log(`Adding blocked segment at angle ${angle}`);
                 features.push({
                     type: 'Feature',
                     geometry: {
@@ -314,7 +305,6 @@ async function generateLineOfSightGeoJSON() {
         }
     }
 
-    console.log(`Generated ${features.length} blocked segments`);
     return {
         type: 'FeatureCollection',
         features: features
@@ -324,47 +314,44 @@ async function generateLineOfSightGeoJSON() {
 // Function to update the line of sight layer
 async function updateLineOfSight() {
     if (!isTerrainLoaded) {
-        console.warn('Waiting for terrain to load...');
         return;
     }
 
-    console.log('Updating line of sight layer...');
-
-    // Remove existing layer and source if they exist
-    if (map.getLayer(LINE_OF_SIGHT_LAYER)) {
-        map.removeLayer(LINE_OF_SIGHT_LAYER);
-    }
-    if (map.getSource(LINE_OF_SIGHT_SOURCE)) {
-        map.removeSource(LINE_OF_SIGHT_SOURCE);
-    }
-
-    // Only add new layer if we have a vantage point
-    if (vantageMarker) {
-        const geojson = await generateLineOfSightGeoJSON();
-        console.log('Generated GeoJSON:', geojson);
-        
-        if (!geojson || !geojson.features || geojson.features.length === 0) {
-            console.warn('No features generated');
-            return;
+    try {
+        // Remove existing layer and source if they exist
+        if (map.getLayer(LINE_OF_SIGHT_LAYER)) {
+            map.removeLayer(LINE_OF_SIGHT_LAYER);
+        }
+        if (map.getSource(LINE_OF_SIGHT_SOURCE)) {
+            map.removeSource(LINE_OF_SIGHT_SOURCE);
         }
 
-        map.addSource(LINE_OF_SIGHT_SOURCE, {
-            type: 'geojson',
-            data: geojson
-        });
-
-        map.addLayer({
-            id: LINE_OF_SIGHT_LAYER,
-            type: 'line',
-            source: LINE_OF_SIGHT_SOURCE,
-            paint: {
-                'line-color': '#000000',
-                'line-opacity': 0.5,
-                'line-width': 2
+        // Only add new layer if we have a vantage point
+        if (vantageMarker) {
+            const geojson = await generateLineOfSightGeoJSON();
+            
+            if (!geojson || !geojson.features || geojson.features.length === 0) {
+                return;
             }
-        });
-        
-        console.log('Line of sight layer added');
+
+            map.addSource(LINE_OF_SIGHT_SOURCE, {
+                type: 'geojson',
+                data: geojson
+            });
+
+            map.addLayer({
+                id: LINE_OF_SIGHT_LAYER,
+                type: 'line',
+                source: LINE_OF_SIGHT_SOURCE,
+                paint: {
+                    'line-color': '#000000',
+                    'line-opacity': 0.5,
+                    'line-width': 2
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error updating line of sight:', error);
     }
 }
 
@@ -382,7 +369,6 @@ function debouncedUpdate() {
 
 // Handle map clicks to set vantage point
 map.on('click', (e) => {
-    console.log('Map clicked, setting vantage point...');
     const coordinates = e.lngLat;
     
     // If marker already exists, move it
@@ -399,14 +385,15 @@ map.on('click', (e) => {
 
         // Hide the message overlay after first click
         const messageOverlay = document.getElementById('message-overlay');
-        messageOverlay.style.opacity = '0';
-        setTimeout(() => {
-            messageOverlay.style.display = 'none';
-        }, 300);
+        if (messageOverlay) {
+            messageOverlay.style.opacity = '0';
+            setTimeout(() => {
+                messageOverlay.style.display = 'none';
+            }, 300);
+        }
 
         // Add drag end handler
         vantageMarker.on('dragend', () => {
-            console.log('Marker dragged, updating line of sight...');
             debouncedUpdate();
         });
     }
@@ -432,22 +419,10 @@ document.getElementById('style-switch').addEventListener('change', (event) => {
         // Re-add marker if it exists
         if (vantageMarker) {
             vantageMarker.addTo(map);
-            updateLineOfSight();
+            // Wait a bit for terrain to be ready before updating
+            setTimeout(() => {
+                updateLineOfSight();
+            }, 1000);
         }
     });
-});
-
-// This will be useful for adding custom layers later
-map.on('style.load', () => {
-    // Here you can add custom layers after the base style is loaded
-    // Example:
-    // map.addLayer({
-    //     id: 'custom-layer',
-    //     type: 'circle',
-    //     source: {
-    //         type: 'geojson',
-    //         data: { ... }
-    //     },
-    //     paint: { ... }
-    // });
 }); 
