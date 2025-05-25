@@ -110,7 +110,8 @@ function updateUrlFragment() {
     const fragment = {
         lat: center.lat.toFixed(6),
         lng: center.lng.toFixed(6),
-        zoom: zoom.toFixed(2)
+        zoom: zoom.toFixed(2),
+        style: document.getElementById('style-switch').value
     };
     
     if (vantageMarker) {
@@ -133,7 +134,10 @@ function parseUrlFragment() {
     const params = {};
     fragment.split('&').forEach(param => {
         const [key, value] = param.split('=');
-        params[key] = parseFloat(value);
+        // Only parse as float for numeric values
+        params[key] = ['lat', 'lng', 'zoom', 'vantageLat', 'vantageLng'].includes(key) 
+            ? parseFloat(value) 
+            : value;
     });
     
     return params;
@@ -142,6 +146,13 @@ function parseUrlFragment() {
 function restoreStateFromUrl() {
     const params = parseUrlFragment();
     if (!params) return;
+    
+    // Restore style first if specified
+    if (params.style && styles[params.style]) {
+        const styleSelect = document.getElementById('style-switch');
+        styleSelect.value = params.style;
+        map.setStyle(styles[params.style]);
+    }
     
     // Restore viewport
     if (params.lat && params.lng && params.zoom) {
@@ -648,6 +659,9 @@ document.getElementById('style-switch').addEventListener('change', (event) => {
     const selectedStyle = event.target.value;
     map.setStyle(styles[selectedStyle]);
     
+    // Update URL fragment when style changes
+    updateUrlFragment();
+    
     // Re-add terrain, marker and lines after style change
     map.once('style.load', () => {
         setupTerrainAndHillshading(map);
@@ -657,7 +671,7 @@ document.getElementById('style-switch').addEventListener('change', (event) => {
             vantageMarker.addTo(map);
             // Wait a bit for terrain to be ready before updating
             setTimeout(() => {
-                updateLineOfSight();
+                debouncedUpdate();
             }, 100);
         }
     });
