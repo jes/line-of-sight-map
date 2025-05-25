@@ -38,6 +38,12 @@ const styles = {
     }
 };
 
+// Configuration constants
+const LINE_LENGTH_METERS = 1000; // 1km sight distance
+const DEGREE_STEP = 1;
+const SAMPLE_POINTS = 50; // Number of points to sample along each ray
+const OBSERVER_HEIGHT = 2; // Height of the observer in meters
+
 // Helper functions for map setup
 function setupTerrainSource(map) {
     console.log('Adding terrain source...');
@@ -135,9 +141,6 @@ let vantageMarker = null;
 let updateTimer = null;
 const LINE_OF_SIGHT_LAYER = 'line-of-sight';
 const LINE_OF_SIGHT_SOURCE = 'line-of-sight-source';
-const LINE_LENGTH_METERS = 1000; // 1km sight distance
-const DEGREE_STEP = 1;
-const SAMPLE_POINTS = 50; // Number of points to sample along each ray
 
 // Function to decode elevation from terrarium encoding
 function getElevationFromTerrainRGB(r, g, b) {
@@ -209,7 +212,6 @@ async function castRay(startPoint, angle, maxDistance) {
     }
 
     const startElevation = await getElevation(startPoint);
-    const OBSERVER_HEIGHT = 2; // 2 meters above ground
     const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
 
     const points = [];
