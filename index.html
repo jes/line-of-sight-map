@@ -60,6 +60,20 @@
             font-size: 14px;
             color: #666;
         }
+        #hover-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            font-size: 14px;
+            display: none;
+        }
+        #hover-info.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -76,6 +90,7 @@
         <button id="delete-vantage" class="toolbar-button delete">Delete vantage point</button>
         <div id="instructions">Click on the map to set your vantage point</div>
     </div>
+    <div id="hover-info"></div>
     <script src="map.js?2"></script>
 </body>
 </html> 

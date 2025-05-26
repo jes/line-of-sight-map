@@ -685,4 +685,74 @@ document.getElementById('style-switch').addEventListener('change', (event) => {
             }, 100);
         }
     });
+});
+
+// Function to calculate bearing between two points
+function calculateBearing(start, end) {
+    const startLat = start.lat * Math.PI / 180;
+    const startLng = start.lng * Math.PI / 180;
+    const endLat = end.lat * Math.PI / 180;
+    const endLng = end.lng * Math.PI / 180;
+
+    const y = Math.sin(endLng - startLng) * Math.cos(endLat);
+    const x = Math.cos(startLat) * Math.sin(endLat) -
+              Math.sin(startLat) * Math.cos(endLat) * Math.cos(endLng - startLng);
+    
+    let bearing = Math.atan2(y, x) * 180 / Math.PI;
+    bearing = (bearing + 360) % 360; // Normalize to 0-360
+    return bearing;
+}
+
+// Function to format distance in appropriate units
+function formatDistance(meters) {
+    if (meters < 1000) {
+        return `${Math.round(meters)}m`;
+    } else {
+        return `${(meters / 1000).toFixed(1)}km`;
+    }
+}
+
+// Function to format angle in degrees
+function formatAngle(radians) {
+    return `${(radians * 180 / Math.PI).toFixed(1)}°`;
+}
+
+// Function to update hover info display
+async function updateHoverInfo(e) {
+    const hoverInfo = document.getElementById('hover-info');
+    
+    if (!vantageMarker) {
+        hoverInfo.classList.remove('visible');
+        return;
+    }
+
+    const vantagePoint = vantageMarker.getLngLat();
+    const hoverPoint = e.lngLat;
+    
+    // Calculate distance
+    const distance = vantagePoint.distanceTo(hoverPoint);
+    
+    // Calculate bearing
+    const bearing = calculateBearing(vantagePoint, hoverPoint);
+    
+    // Calculate elevation angle
+    const startElevation = await getElevation(vantagePoint);
+    const endElevation = await getElevation(hoverPoint);
+    const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
+    const elevationAngle = calculateAngle(vantagePoint, hoverPoint, adjustedStartElevation, endElevation);
+    
+    // Update the display
+    hoverInfo.innerHTML = `
+        <div>Distance: ${formatDistance(distance)}</div>
+        <div>Bearing: ${bearing.toFixed(1)}°</div>
+        <div>Elevation angle: ${formatAngle(elevationAngle)}</div>
+    `;
+    hoverInfo.classList.add('visible');
+}
+
+// Add hover event handlers
+map.on('mousemove', updateHoverInfo);
+map.on('mouseout', () => {
+    const hoverInfo = document.getElementById('hover-info');
+    hoverInfo.classList.remove('visible');
 }); 
