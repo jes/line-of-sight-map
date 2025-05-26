@@ -144,6 +144,38 @@ function parseUrlFragment() {
     return params;
 }
 
+// Function to create and setup a vantage marker
+function createVantageMarker(coordinates) {
+    // Remove existing marker if any
+    if (vantageMarker) {
+        vantageMarker.remove();
+    }
+    
+    // Create new marker
+    vantageMarker = new maplibregl.Marker({
+        color: '#FF0000',
+        draggable: true
+    })
+    .setLngLat(coordinates)
+    .addTo(map);
+    
+    // Hide instructions and show delete button
+    const instructions = document.getElementById('instructions');
+    if (instructions) {
+        instructions.style.display = 'none';
+    }
+    updateDeleteButtonVisibility();
+    
+    // Add drag end handler
+    vantageMarker.on('dragend', () => {
+        debouncedUpdate();
+        updateUrlFragment();
+    });
+    
+    // Update line of sight
+    debouncedUpdate();
+}
+
 function restoreStateFromUrl() {
     const params = parseUrlFragment();
     if (!params) return;
@@ -164,35 +196,7 @@ function restoreStateFromUrl() {
     // Restore vantage point
     if (params.vantageLat && params.vantageLng) {
         const coordinates = new maplibregl.LngLat(params.vantageLng, params.vantageLat);
-        
-        // Remove existing marker if any
-        if (vantageMarker) {
-            vantageMarker.remove();
-        }
-        
-        // Create new marker
-        vantageMarker = new maplibregl.Marker({
-            color: '#FF0000',
-            draggable: true
-        })
-        .setLngLat(coordinates)
-        .addTo(map);
-        
-        // Hide instructions and show delete button
-        const instructions = document.getElementById('instructions');
-        if (instructions) {
-            instructions.style.display = 'none';
-        }
-        updateDeleteButtonVisibility();
-        
-        // Add drag end handler
-        vantageMarker.on('dragend', () => {
-            debouncedUpdate();
-            updateUrlFragment();
-        });
-        
-        // Update line of sight
-        debouncedUpdate();
+        createVantageMarker(coordinates);
     }
 }
 
@@ -635,36 +639,7 @@ function deleteVantagePoint() {
 
 // Handle map clicks to set vantage point
 map.on('click', (e) => {
-    const coordinates = e.lngLat;
-    
-    // If marker already exists, move it
-    if (vantageMarker) {
-        vantageMarker.setLngLat(coordinates);
-    } else {
-        // Create new marker
-        vantageMarker = new maplibregl.Marker({
-            color: '#FF0000',
-            draggable: true
-        })
-        .setLngLat(coordinates)
-        .addTo(map);
-
-        // Hide the instructions after first click and show delete button
-        const instructions = document.getElementById('instructions');
-        if (instructions) {
-            instructions.style.display = 'none';
-        }
-        updateDeleteButtonVisibility();
-
-        // Add drag end handler
-        vantageMarker.on('dragend', () => {
-            debouncedUpdate();
-            updateUrlFragment();
-        });
-    }
-    
-    // Update lines after vantage point changes
-    debouncedUpdate();
+    createVantageMarker(e.lngLat);
     updateUrlFragment();
 });
 
