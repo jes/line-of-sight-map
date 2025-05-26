@@ -44,6 +44,22 @@
             color: #666;
             font-size: 14px;
         }
+        .height-input {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .height-input input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .height-input label {
+            font-size: 14px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -53,6 +69,10 @@
             <option value="map">Map view</option>
             <option value="satellite">Satellite view</option>
         </select>
+        <div class="height-input">
+            <label for="observer-height" title="Height above ground">Observer height:</label>
+            <input type="text" id="observer-height" value="1.8" style="width:20px"> m
+        </div>
         <button id="delete-vantage" class="toolbar-button delete">Delete vantage point</button>
         <div id="instructions">Click on the map to set your vantage point</div>
     </div>

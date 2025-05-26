@@ -41,7 +41,7 @@ const styles = {
 // Configuration constants
 const DEGREE_STEP = 0.5;
 const SAMPLE_POINTS = 800; // Number of points to sample along each ray
-const OBSERVER_HEIGHT = 2; // Height of the observer in meters
+let OBSERVER_HEIGHT = 1.8; // Height of the observer in meters
 const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
 const EARTH_RADIUS = 6371000; // Earth's radius in meters
 const PROGRESSIVE_RENDERING = {
@@ -206,6 +206,17 @@ const map = new maplibregl.Map({
 
 // Add navigation controls
 map.addControl(new maplibregl.NavigationControl());
+
+// Add observer height input handler
+document.getElementById('observer-height').addEventListener('input', (e) => {
+    const newHeight = parseFloat(e.target.value);
+    if (!isNaN(newHeight) && newHeight >= 0) {
+        OBSERVER_HEIGHT = newHeight;
+        if (vantageMarker) {
+            debouncedUpdate();
+        }
+    }
+});
 
 // Track if terrain is ready
 let isTerrainLoaded = false;
