@@ -735,11 +735,19 @@ async function updateHoverInfo(e) {
     // Calculate bearing
     const bearing = calculateBearing(vantagePoint, hoverPoint);
     
-    // Calculate elevation angle
+    // Calculate elevation angle with Earth's curvature
     const startElevation = await getElevation(vantagePoint);
     const endElevation = await getElevation(hoverPoint);
     const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
-    const elevationAngle = calculateAngle(vantagePoint, hoverPoint, adjustedStartElevation, endElevation);
+    
+    // Calculate Earth's curvature drop at this distance
+    const curvatureDrop = calculateEarthCurvatureDrop(distance);
+    
+    // Adjust the end elevation by subtracting the curvature drop
+    const adjustedEndElevation = endElevation - curvatureDrop;
+    
+    // Calculate the elevation angle with adjusted elevations
+    const elevationAngle = calculateAngle(vantagePoint, hoverPoint, adjustedStartElevation, adjustedEndElevation);
     
     // Update the display
     hoverInfo.innerHTML = `
