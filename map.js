@@ -43,6 +43,7 @@ const DEGREE_STEP = 0.5;
 const SAMPLE_POINTS = 800; // Number of points to sample along each ray
 const OBSERVER_HEIGHT = 2; // Height of the observer in meters
 const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
+const EARTH_RADIUS = 6371000; // Earth's radius in meters
 const PROGRESSIVE_RENDERING = {
     anglesPerIteration: 45, // Process 45 angles per iteration
     totalAngles: 3000,     // Target total number of angles (increased from 1000 to 10000)
@@ -309,6 +310,13 @@ function calculateViewportDistance(vantagePoint) {
     return Math.min(Math.max(...distances), MAX_LINE_LENGTH_METERS);
 }
 
+// Function to calculate Earth's curvature drop at a given distance
+function calculateEarthCurvatureDrop(distance) {
+    // Using the formula: drop = (distance^2) / (2 * Earth's radius)
+    // This is an approximation that works well for distances up to about 100km
+    return (distance * distance) / (2 * EARTH_RADIUS);
+}
+
 // Function to cast a ray and find terrain intersections
 async function castRay(startPoint, angle, maxDistance) {
     if (!isTerrainLoaded) {
@@ -336,8 +344,14 @@ async function castRay(startPoint, angle, maxDistance) {
             const point = calculateDestinationPoint(startPoint, angle, distance);
             const elevation = await getElevation(point);
 
+            // Calculate Earth's curvature drop at this distance
+            const curvatureDrop = calculateEarthCurvatureDrop(distance);
+            
+            // Adjust the elevation by subtracting the curvature drop
+            const adjustedElevation = elevation - curvatureDrop;
+
             // Calculate the angle to this point
-            const pointAngle = calculateAngle(startPoint, point, adjustedStartElevation, elevation);
+            const pointAngle = calculateAngle(startPoint, point, adjustedStartElevation, adjustedElevation);
             
             // Determine visibility - a point is blocked if its angle is less than the maximum angle seen
             const isBlocked = pointAngle < maxAngleSeen;
