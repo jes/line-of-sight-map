@@ -210,7 +210,7 @@ map.addControl(new maplibregl.NavigationControl());
 // Add observer height input handler
 document.getElementById('observer-height').addEventListener('input', (e) => {
     const newHeight = parseFloat(e.target.value);
-    if (!isNaN(newHeight) && newHeight >= 0) {
+    if (!isNaN(newHeight)) {
         OBSERVER_HEIGHT = newHeight;
         if (vantageMarker) {
             debouncedUpdate();
