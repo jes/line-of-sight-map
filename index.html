@@ -20,6 +20,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
         }
         .toolbar-button {
             padding: 5px 10px;
@@ -74,11 +75,38 @@
         #hover-info.visible {
             display: block;
         }
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .search-box input {
+            width: 200px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-box button {
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .search-box button:hover {
+            background: #f0f0f0;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div class="map-overlay">
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search location...">
+            <button id="search-button">Search</button>
+        </div>
         <select id="style-switch">
             <option value="map">Map view</option>
             <option value="satellite">Satellite view</option>

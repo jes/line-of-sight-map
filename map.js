@@ -212,6 +212,51 @@ const map = new maplibregl.Map({
 // Add navigation controls
 map.addControl(new maplibregl.NavigationControl());
 
+// Add search functionality
+async function searchLocation(query) {
+    try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+            const result = data[0];
+            const lngLat = [parseFloat(result.lon), parseFloat(result.lat)];
+            
+            // Fly to the location
+            map.flyTo({
+                center: lngLat,
+                zoom: 14,
+                essential: true
+            });
+            
+            // If there's a vantage point, update it
+            if (vantageMarker) {
+                vantageMarker.setLngLat(lngLat);
+                debouncedUpdate();
+            }
+        }
+    } catch (error) {
+        console.error('Error searching location:', error);
+    }
+}
+
+// Add search event listeners
+document.getElementById('search-button').addEventListener('click', () => {
+    const query = document.getElementById('search-input').value;
+    if (query) {
+        searchLocation(query);
+    }
+});
+
+document.getElementById('search-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const query = e.target.value;
+        if (query) {
+            searchLocation(query);
+        }
+    }
+});
+
 // Add observer height input handler
 document.getElementById('observer-height').addEventListener('input', (e) => {
     const newHeight = parseFloat(e.target.value);
