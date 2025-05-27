@@ -205,8 +205,7 @@ const map = new maplibregl.Map({
     container: 'map',
     style: styles.map,
     center: [0, 0],  // Default world view (center of the map)
-    zoom: 2,  // Zoom level that shows most of the world
-    maxCanvasSize: [32768, 32768]
+    zoom: 2  // Zoom level that shows most of the world
 });
 
 // Add navigation controls
