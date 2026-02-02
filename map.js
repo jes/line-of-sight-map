@@ -42,7 +42,7 @@ const styles = {
 const DEGREE_STEP = 0.5;
 const SAMPLE_POINTS = 800; // Number of points to sample along each ray
 let OBSERVER_HEIGHT = 1.8; // Height of the observer in meters
-const MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
+let MAX_LINE_LENGTH_METERS = 100000; // Maximum line length (100km)
 const EARTH_RADIUS = 6371000; // Earth's radius in meters
 const PROGRESSIVE_RENDERING = {
     anglesPerIteration: 45, // Process 45 angles per iteration
@@ -261,6 +261,17 @@ document.getElementById('observer-height').addEventListener('input', (e) => {
     const newHeight = parseFloat(e.target.value);
     if (!isNaN(newHeight)) {
         OBSERVER_HEIGHT = newHeight;
+        if (vantageMarker) {
+            debouncedUpdate();
+        }
+    }
+});
+
+// Add max distance input handler
+document.getElementById('max-distance').addEventListener('input', (e) => {
+    const newDistance = parseFloat(e.target.value) * 1000; // Convert km to meters
+    if (!isNaN(newDistance) && newDistance > 0) {
+        MAX_LINE_LENGTH_METERS = newDistance;
         if (vantageMarker) {
             debouncedUpdate();
         }
@@ -762,6 +773,9 @@ function formatAngle(radians) {
 }
 
 // Function to update hover info display
+let hoverTimer = null;
+let lastHoverPoint = null;
+
 async function updateHoverInfo(e) {
     const hoverInfo = document.getElementById('hover-info');
     
@@ -772,6 +786,7 @@ async function updateHoverInfo(e) {
 
     const vantagePoint = vantageMarker.getLngLat();
     const hoverPoint = e.lngLat;
+    lastHoverPoint = hoverPoint;
     
     // Calculate distance
     const distance = vantagePoint.distanceTo(hoverPoint);
@@ -793,13 +808,93 @@ async function updateHoverInfo(e) {
     // Calculate the elevation angle with adjusted elevations
     const elevationAngle = calculateAngle(vantagePoint, hoverPoint, adjustedStartElevation, adjustedEndElevation);
     
-    // Update the display
+    // Update the display with basic info
     hoverInfo.innerHTML = `
         <div>Distance: ${formatDistance(distance)}</div>
         <div>Bearing: ${bearing.toFixed(1)}°</div>
         <div>Elevation angle: ${formatAngle(elevationAngle)}</div>
+        <div id="visibility-status">Checking visibility...</div>
     `;
     hoverInfo.classList.add('visible');
+    
+    // Clear any existing timer
+    if (hoverTimer) {
+        clearTimeout(hoverTimer);
+    }
+    
+    // Set a timer to check visibility after 50ms
+    hoverTimer = setTimeout(async () => {
+        // Make sure we're still hovering over the same point
+        if (lastHoverPoint && 
+            Math.abs(lastHoverPoint.lat - hoverPoint.lat) < 0.0001 && 
+            Math.abs(lastHoverPoint.lng - hoverPoint.lng) < 0.0001) {
+            
+            const isVisible = await checkPointVisibility(vantagePoint, hoverPoint);
+            const visibilityStatus = document.getElementById('visibility-status');
+            if (visibilityStatus) {
+                visibilityStatus.innerHTML = isVisible ? 
+                    '<span style="color: #00aa00;">✓ Visible</span>' : 
+                    '<span style="color: #aa0000;">✗ Occluded</span>';
+            }
+        }
+    }, 50);
+}
+
+// Function to check if a specific point is visible from the vantage point
+async function checkPointVisibility(vantagePoint, targetPoint) {
+    if (!isTerrainLoaded) {
+        return true; // Assume visible if terrain not loaded
+    }
+
+    try {
+        const distance = vantagePoint.distanceTo(targetPoint);
+        const bearing = calculateBearing(vantagePoint, targetPoint);
+        
+        // Get elevations
+        const startElevation = await getElevation(vantagePoint);
+        const targetElevation = await getElevation(targetPoint);
+        const adjustedStartElevation = startElevation + OBSERVER_HEIGHT;
+        
+        // Calculate Earth's curvature drop at target distance
+        const targetCurvatureDrop = calculateEarthCurvatureDrop(distance);
+        const adjustedTargetElevation = targetElevation - targetCurvatureDrop;
+        
+        // Calculate the angle to the target point
+        const targetAngle = calculateAngle(vantagePoint, targetPoint, adjustedStartElevation, adjustedTargetElevation);
+        
+        // Sample points along the ray to check for obstructions
+        const sampleCount = Math.min(100, Math.floor(distance / 100)); // Sample every ~100m or 100 points max
+        let maxAngleSeen = -Infinity;
+        
+        for (let i = 1; i < sampleCount; i++) {
+            const fraction = i / sampleCount;
+            const sampleDistance = distance * fraction;
+            
+            // Calculate the sample point coordinates
+            const samplePoint = calculateDestinationPoint(vantagePoint, bearing, sampleDistance);
+            const sampleElevation = await getElevation(samplePoint);
+            
+            // Calculate Earth's curvature drop at this distance
+            const sampleCurvatureDrop = calculateEarthCurvatureDrop(sampleDistance);
+            const adjustedSampleElevation = sampleElevation - sampleCurvatureDrop;
+            
+            // Calculate the angle to this sample point
+            const sampleAngle = calculateAngle(vantagePoint, samplePoint, adjustedStartElevation, adjustedSampleElevation);
+            
+            // Update the maximum angle seen
+            maxAngleSeen = Math.max(maxAngleSeen, sampleAngle);
+            
+            // If the target angle is less than the maximum angle seen so far, it's occluded
+            if (targetAngle < maxAngleSeen) {
+                return false;
+            }
+        }
+        
+        return true; // No obstruction found
+    } catch (error) {
+        console.error('Error checking point visibility:', error);
+        return true; // Assume visible on error
+    }
 }
 
 // Add hover event handlers
@@ -807,4 +902,11 @@ map.on('mousemove', updateHoverInfo);
 map.on('mouseout', () => {
     const hoverInfo = document.getElementById('hover-info');
     hoverInfo.classList.remove('visible');
+    lastHoverPoint = null;
+    
+    // Clear the hover timer
+    if (hoverTimer) {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+    }
 }); 
